@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard de KPIs</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/png">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Font Awesome para iconos -->
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body>
+    <!-- Navbar sin menú hamburguesa -->
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <img src="{{ url_for('static', filename='img/logo_PB.png') }}" alt="Logo" class="me-2" style="height: 70px;">
+                Dashboard KPIs
+            </a>
+            <div class="d-none d-md-flex flex-column align-items-end text-white ms-auto me-2">
+                <strong>{{ user_name }}</strong>
+                <small>{{ user_email }}</small>
+            </div>
+            <div class="dropdown user-menu">
+                <a class="nav-link text-white" href="#" role="button" id="userDropdown" data-bs-toggle="dropdown"
+                    aria-expanded="false">
+                    <i class="fas fa-user-circle fa-2x"></i>
+                    <i class="fas fa-chevron-down"></i> <!-- Flecha más grande -->
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end mt-2" aria-labelledby="userDropdown">
+                    <li class="d-md-none dropdown-item-text text-center">
+                        <strong>{{ user_name }}</strong><br>
+                        <small class="text-muted">{{ user_email }}</small>
+                    </li>
+                    <li><hr class="dropdown-divider d-md-none"></li>
+                    <li><a class="dropdown-item text-danger text-center" href="{{ url_for('logout') }}">Cerrar Sesión</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido principal -->
+    <div class="container-fluid my-4">
+        <!-- Filtros en una tarjeta -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" action="{{ url_for('dashboard') }}" class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label for="department" class="form-label">Departamento:</label>
+                        <select name="department" id="department" class="form-select" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}" {% if dept==selected_dept %}selected{% endif %}>{{ dept }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label for="user" class="form-label">Usuario:</label>
+                        <select name="user" id="user" class="form-select" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            {% if selected_dept %}
+                            {% for user in users[selected_dept] %}
+                            <option value="{{ user }}" {% if user==selected_user %}selected{% endif %}>{{ user }}
+                            </option>
+                            {% endfor %}
+                            {% else %}
+                            {% for dept, users_list in users.items() %}
+                            {% for user in users_list %}
+                            <option value="{{ user }}" {% if user==selected_user %}selected{% endif %}>{{ user }} ({{
+                                dept }})</option>
+                            {% endfor %}
+                            {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Contenedor de gráficos -->
+        <div class="card w-100 ">
+            <div class="card-body">
+                <div id="plotlyGraph" class="w-100">
+                    {{ kpi_graph_html | safe }}
+                </div>
+                <div id="ganttGraph" class="w-100 mt-4">
+                    {{ gantt_graph_html | safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
