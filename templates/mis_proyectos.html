@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Mis Proyectos{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h3 class="my-4">Mis Proyectos</h3>
+    
+    {% if proyectos %}
+        <div class="list-group">
+            {% for proyecto in proyectos %}
+                <a href="{{ url_for('detalle_proyecto', id=proyecto.id) }}" class="list-group-item list-group-item-action">
+                    <h5 class="mb-1">{{ proyecto.descripcion }}</h5>
+                    <small>Encargado: {{ proyecto.encargado }}</small>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted">No tienes proyectos asignados.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ proyecto.descripcion }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h3 class="my-4">{{ proyecto.descripcion }}</h3>
+    <p><strong>Encargado:</strong> {{ proyecto.encargado }}</p>
+    
+    {% set meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+    {% set dias_acumulados = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365] %}
+    
+    {% macro convertir_fecha(dia_anio, anio=2025) %}
+        {% for i in range(1, 13) %}
+            {% if dia_anio > dias_acumulados[i-1] and dia_anio <= dias_acumulados[i] %}
+                {% set dia = dia_anio - dias_acumulados[i-1] %}
+                {% set mes = i %}
+                {{ dia }}/{{ mes }}/{{ anio }}
+            {% endif %}
+        {% endfor %}
+    {% endmacro %}
+    
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Actividad</th>
+                <th>Inicio Planificado</th>
+                <th>Finalización Planificada</th>
+                <th>Inicio Real</th>
+                <th>Fecha Finalización</th>
+                <th>Finalizar</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for actividad in actividades %}
+            <tr>
+                <td>{{ actividad.descripcion }}</td>
+                <td>
+                    {% if actividad.inicio_planificado %}
+                        {{ convertir_fecha(actividad.inicio_planificado|int, actividad.anio|default(2025)) }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+                <td>
+                    {% if actividad.duracion_planificada and actividad.inicio_planificado %}
+                        {% set fin_dia = (actividad.inicio_planificado|int) + (actividad.duracion_planificada|int) %}
+                        {{ convertir_fecha(fin_dia, actividad.anio|default(2025)) }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+                <td>
+                    {% if actividad.inicio_real_dia %}
+                        {{ convertir_fecha(actividad.inicio_real_dia|int, actividad.anio|default(2025)) }}
+                    {% else %}
+                        Pendiente
+                    {% endif %}
+                </td>
+                <td>
+                    <input type="date" class="form-control" data-actividad-id="{{ actividad.id }}">
+                </td>
+                <td>
+                    <input type="checkbox" class="form-check-input" data-actividad-id="{{ actividad.id }}">
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <button class="btn btn-primary mt-3" onclick="finalizarActividades()">Aceptar</button>
+    
+    <a href="{{ url_for('mis_proyectos') }}" class="btn btn-secondary mt-3">Volver a Mis Proyectos</a>
+</div>
+
+<script>
+function finalizarActividades() {
+    let checkboxes = document.querySelectorAll('.form-check-input:checked');
+    let actividades = [];
+
+    checkboxes.forEach(checkbox => {
+        let actividadId = checkbox.getAttribute('data-actividad-id');
+        let fechaFinalizacion = document.querySelector(`input[data-actividad-id="${actividadId}"][type="date"]`).value;
+
+        actividades.push({ id: actividadId, fecha_fin: fechaFinalizacion });
+    });
+
+    if (actividades.length === 0) {
+        alert("No hay actividades seleccionadas.");
+        return;
+    }
+
+    fetch("/finalizar_actividades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actividades: actividades })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert("Actividades finalizadas correctamente.");
+            location.reload();
+        } else {
+            alert("Error al finalizar actividades.");
+        }
+    })
+    .catch(error => console.error("Error en la solicitud:", error));
+}
+</script>
+{% endblock %}
