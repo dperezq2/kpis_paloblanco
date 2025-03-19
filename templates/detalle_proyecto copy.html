@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}{{ proyecto.descripcion }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h3 class="my-4">{{ proyecto.descripcion }}</h3>
+    <p><strong>Encargado:</strong> {{ proyecto.encargado }}</p>
+
+    {% set meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre',
+    'Octubre', 'Noviembre', 'Diciembre'] %}
+    {% set dias_acumulados = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365] %}
+
+    {% macro convertir_fecha(dia_anio, anio=2025) %}
+    {% for i in range(1, 13) %}
+    {% if dia_anio > dias_acumulados[i-1] and dia_anio <= dias_acumulados[i] %} {% set dia=dia_anio -
+        dias_acumulados[i-1] %} {% set mes=i %} {{ dia }}/{{ mes }}/{{ anio }} {% endif %} {% endfor %} {% endmacro %}
+        {% macro convertir_fecha_input(dia_anio, anio=2025) %} {% for i in range(1, 13) %} {% if dia_anio>
+        dias_acumulados[i-1] and dia_anio <= dias_acumulados[i] %} {% set dia=dia_anio - dias_acumulados[i-1] %} {% set
+            mes=i %} {{ anio }}-{{ '%02d' |format(mes) }}-{{ '%02d' |format(dia) }} {% endif %} {% endfor %} {% endmacro
+            %} <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Actividad</th>
+                    <th>Inicio Planificado</th>
+                    <th>Finalización Planificada</th>
+                    <th>Inicio Real</th>
+                    <th>Fecha Finalización</th>
+                    <th>Finalizar</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for actividad in actividades %}
+                <tr {% if actividad.duracion_real and actividad.duracion_real.finalizada %}class="table-success" {%
+                    endif %}>
+                    <td>{{ actividad.descripcion }}</td>
+                    <td>
+                        {% if actividad.inicio_planificado %}
+                        {{ convertir_fecha(actividad.inicio_planificado|int, actividad.anio|default(2025)) }}
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if actividad.duracion_planificada and actividad.inicio_planificado %}
+                        {% set fin_dia = (actividad.inicio_planificado|int) + (actividad.duracion_planificada|int) %}
+                        {{ convertir_fecha(fin_dia, actividad.anio|default(2025)) }}
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+                    <td>
+                        <input type="date" class="form-control inicio-real" data-actividad-id="{{ actividad.id }}" {% if
+                            actividad.inicio_real_dia %}
+                            value="{{ convertir_fecha_input(actividad.inicio_real_dia|int, actividad.anio|default(2025)) }}"
+                            {% endif %} {% if actividad.duracion_real and actividad.duracion_real.finalizada
+                            %}disabled{% endif %} onchange="guardarFecha( actividad.id , 'inicio_real', this.value)">
+                    </td>
+                    <td>
+                        <input type="date" class="form-control fecha-fin" data-actividad-id="{{ actividad.id }}" {% if
+                            actividad.duracion_real and actividad.duracion_real.fecha_fin %}
+                            value="{{ actividad.duracion_real.fecha_fin.strftime('%Y-%m-%d') }}" {% endif %} {% if
+                            actividad.duracion_real and actividad.duracion_real.finalizada %}disabled{% endif %}
+                            onchange="guardarFecha( actividad.id , 'fecha_fin', this.value)">
+                    </td>
+                    <td>
+                        <input type="checkbox" class="form-check-input" data-actividad-id="{{ actividad.id }}" {% if
+                            actividad.duracion_real and actividad.duracion_real.finalizada %} checked disabled {% endif
+                            %}>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+
+            <button class="btn btn-primary mt-3" onclick="finalizarActividades()">Finalizar Actividades
+                Seleccionadas</button>
+
+            <a href="{{ url_for('mis_proyectos') }}" class="btn btn-secondary mt-3">Volver a Mis Proyectos</a>
+</div>
+
+<script>
+    // Función para guardar inmediatamente una fecha al cambiarla
+    function guardarFecha(actividadId, tipo, valor) {
+        if (!valor) return; // No hacer nada si no hay valor
+
+        const data = {
+            id: actividadId
+        };
+        data[tipo] = valor;
+
+        fetch("/actualizar_fecha_actividad", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log(`Fecha de ${tipo} actualizada correctamente para actividad ${actividadId}`);
+                } else {
+                    alert(`Error al guardar la fecha de ${tipo}.`);
+                    console.error("Error:", data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error en la solicitud:", error);
+                alert("Error al guardar la fecha. Intente nuevamente.");
+            });
+    }
+
+    // Función para finalizar las actividades seleccionadas
+    function finalizarActividades() {
+        let checkboxes = document.querySelectorAll('.form-check-input:not(:disabled):checked');
+        let actividades = [];
+
+        checkboxes.forEach(checkbox => {
+            let actividadId = checkbox.getAttribute('data-actividad-id');
+            actividades.push({ actividad_id: actividadId });  // Cambia 'id' por 'actividad_id'
+        });
+
+        if (actividades.length === 0) {
+            alert("No hay actividades seleccionadas para finalizar.");
+            return;
+        }
+
+        fetch("/finalizar_actividades", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ actividades: actividades })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Actividades finalizadas correctamente.");
+                    location.reload();
+                } else {
+                    alert("Error al finalizar actividades.");
+                    console.error("Error:", data.error);
+                }
+            })
+            .catch(error => console.error("Error en la solicitud:", error));
+    }
+</script>
+{% endblock %}

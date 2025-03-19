@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Agregar Proyecto{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="card-header">
+            <h3>Agregar Proyecto</h3>
+        </div>
+        <div class="card-body">
+
+            <form method="POST" action="{{ url_for('agregar_proyecto') }}">
+                <div class="mb-3">
+                    <label for="descripcion" class="form-label">Nombre del Proyecto</label>
+                    <input type="text" class="form-control" id="descripcion" name="descripcion" required>
+                </div>
+
+                <!-- Selección de Frecuencia -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="frecuencia" class="form-label">Frecuencia</label>
+                        <select class="form-control" id="frecuencia" name="frecuencia" required onchange="actualizarPeriodo()">
+                            <option value="Mensual">Mensual</option>
+                            <option value="Bimestral">Bimestral</option>
+                            <option value="Trimestral">Trimestral</option>
+                            <option value="Semestral">Semestral</option>
+                            <option value="Anual">Anual</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="mes_inicio" class="form-label">Mes de Inicio</label>
+                        <select class="form-control" id="mes_inicio" name="mes_inicio" required onchange="actualizarPeriodo()">
+                            <option value="Enero">Enero</option>
+                            <option value="Febrero">Febrero</option>
+                            <option value="Marzo">Marzo</option>
+                            <option value="Abril">Abril</option>
+                            <option value="Mayo">Mayo</option>
+                            <option value="Junio">Junio</option>
+                            <option value="Julio">Julio</option>
+                            <option value="Agosto">Agosto</option>
+                            <option value="Septiembre">Septiembre</option>
+                            <option value="Octubre">Octubre</option>
+                            <option value="Noviembre">Noviembre</option>
+                            <option value="Diciembre">Diciembre</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Mostrar Período Calculado -->
+                <div class="mt-3">
+                    <label class="form-label">Período</label>
+                    <input type="text" class="form-control" id="periodo_mostrado" readonly>
+                    <input type="hidden" id="anio" name="anio" value="{{ current_year }}">
+                </div>
+
+                <!-- Campo oculto para el encargado (por defecto el usuario actual) -->
+                <input type="hidden" name="encargado" value="{{ user_name }}">
+
+                <!-- Contenedor de Actividades -->
+                <div id="actividadesContainer" class="mt-4">
+                    <h4>Actividades</h4>
+                </div>
+                <button type="button" class="btn btn-secondary mt-2" onclick="agregarActividad()">Agregar Actividad</button>
+                
+                <!-- Botón de envío -->
+                <button type="submit" class="btn btn-primary mt-3">Guardar Proyecto</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        const mesesNumero = {
+            "Enero": 1, "Febrero": 2, "Marzo": 3, "Abril": 4, "Mayo": 5, "Junio": 6, 
+            "Julio": 7, "Agosto": 8, "Septiembre": 9, "Octubre": 10, "Noviembre": 11, "Diciembre": 12
+        };
+    
+        function actualizarPeriodo() {
+            const frecuencia = document.getElementById("frecuencia").value;
+            const mesInicio = document.getElementById("mes_inicio").value;
+            const indexInicio = meses.indexOf(mesInicio);
+            const yearActual = new Date().getFullYear();
+            
+            // Actualizar el valor del año
+            document.getElementById("anio").value = yearActual;
+    
+            let duracion;
+            switch (frecuencia) {
+                case "Mensual": duracion = 1; break;
+                case "Bimestral": duracion = 2; break;
+                case "Trimestral": duracion = 3; break;
+                case "Semestral": duracion = 6; break;
+                case "Anual": duracion = 12; break;
+                default: duracion = 1;
+            }
+    
+            // Calcular meses del período
+            let periodo = [];
+            let yearFin = yearActual;
+            for (let i = 0; i < duracion; i++) {
+                let mesIndex = (indexInicio + i) % 12;
+                periodo.push(meses[mesIndex]);
+    
+                // Si el mes da la vuelta (pasa de diciembre a enero), aumentar el año de finalización
+                if (mesIndex === 0 && i > 0) {
+                    yearFin++;
+                }
+            }
+    
+            // Mes de inicio y mes de fin
+            const mesInicioTexto = periodo[0];
+            const mesFinTexto = periodo[periodo.length - 1];
+    
+            // Mostrar el período calculado
+            document.getElementById("periodo_mostrado").value = `${mesInicioTexto} ${yearActual} - ${mesFinTexto} ${yearFin}`;
+        }
+    
+        function agregarActividad() {
+    const container = document.getElementById('actividadesContainer');
+    const index = container.children.length - 1; // Restar 1 porque el título cuenta como hijo
+
+    const actividadDiv = document.createElement('div');
+    actividadDiv.classList.add('border', 'p-3', 'mb-3');
+
+    actividadDiv.innerHTML = `
+        <label class="form-label">Descripción de la Actividad</label>
+        <input type="text" class="form-control mb-3" name="actividad_${index}_descripcion" required>
+
+        <div class="row">
+            <div class="col-md-6">
+                <label class="form-label">Inicio Planificado</label>
+                <input type="date" class="form-control mb-3" name="actividad_${index}_inicio_planificado" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Duración Planificada (Días)</label>
+                <input type="number" class="form-control mb-3" name="actividad_${index}_duracion_planificada" min="1" required>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <label class="form-label">Inicio Real</label>
+                <input type="date" class="form-control mb-3" name="actividad_${index}_inicio_real">
+                <small class="text-muted">Opcional. Completar cuando inicie la actividad.</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Duración Real (Días)</label>
+                <input type="number" class="form-control mb-3" name="actividad_${index}_duracion_real" min="1">
+                <small class="text-muted">Opcional. Completar cuando finalice la actividad.</small>
+            </div>
+        </div>
+        
+        <button type="button" class="btn btn-danger btn-sm" onclick="eliminarActividad(this)">Eliminar Actividad</button>
+    `;
+
+    container.appendChild(actividadDiv);
+}
+        function eliminarActividad(boton) {
+            const actividadDiv = boton.parentElement;
+            
+            // Verificar si es la única actividad
+            const actividades = document.querySelectorAll('#actividadesContainer > div');
+            if (actividades.length <= 1) {
+                alert('Debe haber al menos una actividad en el proyecto.');
+                return;
+            }
+            
+            actividadDiv.remove();
+            
+            // Renumerar los índices de las actividades restantes
+            const actividadesRestantes = document.querySelectorAll('#actividadesContainer > div');
+            actividadesRestantes.forEach((div, index) => {
+                const inputs = div.querySelectorAll('input');
+                inputs.forEach(input => {
+                    const nombreInput = input.name;
+                    if (nombreInput.startsWith('actividad_')) {
+                        input.name = nombreInput.replace(/actividad_\d+/, `actividad_${index}`);
+                    }
+                });
+            });
+        }
+        
+        // Inicializar con una actividad
+        document.addEventListener('DOMContentLoaded', function() {
+            actualizarPeriodo();
+            agregarActividad();
+        });
+    </script>
+{% endblock %}

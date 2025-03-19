@@ -334,7 +334,7 @@ def dashboard():
     active_tab = request.args.get('active_tab', 'kpis')
 
     # Obtener todos los proyectos para el filtro
-    proyectos = Proyecto.query.filter_by(encargado=session['user_id']).all()
+    proyectos = Proyecto.query.all()
 
     # Filtrar los datos de KPIs y actividades
     filtered_kpi_df = kpi_df.copy()
@@ -380,28 +380,21 @@ def dashboard():
         kpi_graph_html = "<p>No hay datos de KPIs para mostrar.</p>"
 
     # Gráfico de Gantt para proyectos
-    # Obtener los proyectos donde el usuario de la sesión es encargado
-    proyectos_usuario = Proyecto.query.filter_by(encargado=session['user_id']).all()
-    proyectos_ids = [proyecto.id for proyecto in proyectos_usuario]
-
-    # Iniciar la consulta base para el Gantt
-    if selected_proyecto and int(selected_proyecto) in proyectos_ids:
-        # Si hay un proyecto seleccionado y pertenece al usuario
+    if selected_proyecto:
         query = Actividad.query.filter_by(id_proyecto=selected_proyecto)
         proyecto_descripcion = Proyecto.query.get(selected_proyecto).descripcion
     else:
-        # Mostrar actividades de todos los proyectos del usuario
-        query = Actividad.query.filter(Actividad.id_proyecto.in_(proyectos_ids))
-        proyecto_descripcion = "mis proyectos"
+        query = Actividad.query
+        proyecto_descripcion = "todos los proyectos"
 
-    # Continuar con el resto del filtrado (estado, etc.)
+    # Filtrar por estado si se seleccionó uno
     if selected_estado:
         if selected_estado == "COMPLETADA":
             query = query.filter_by(estado="finalizada")
         elif selected_estado == "PENDIENTE":
             query = query.filter(Actividad.estado != "finalizada")
 
-    # Ordenar actividades
+    # Ordenar actividades por id_actividad de manera descendente
     actividades = query.order_by(Actividad.id.desc()).all()
 
     # Generar datos para el gráfico de Gantt
@@ -512,22 +505,15 @@ def dashboard():
         gantt_html = "<p>No hay actividades para mostrar.</p>"
 
     # NUEVA SECCIÓN: Preparar datos para la Curva S
-    # Obtener los proyectos donde el usuario de la sesión es encargado
-    proyectos_usuario = Proyecto.query.filter_by(encargado=session['user_id']).all()
-    proyectos_ids = [proyecto.id for proyecto in proyectos_usuario]
-
-    # Iniciar la consulta base para la Curva S
     all_activities = Actividad.query
-
-    # Si hay proyecto seleccionado para la curva S, verificar que pertenezca al usuario
-    if selected_proyecto and int(selected_proyecto) in proyectos_ids:
+    
+    # Si hay proyecto seleccionado para la curva S, filtrar por ese proyecto
+    if selected_proyecto:
         all_activities = all_activities.filter_by(id_proyecto=selected_proyecto)
         proyecto_descripcion = Proyecto.query.get(selected_proyecto).descripcion
     else:
-        # Mostrar la curva S de todos los proyectos del usuario
-        all_activities = all_activities.filter(Actividad.id_proyecto.in_(proyectos_ids))
-        proyecto_descripcion = "Mis Proyectos"
-
+        proyecto_descripcion = "Todos los Proyectos"
+    
     all_activities = all_activities.all()
     
     # Obtener la fecha más temprana y más tardía para establecer el rango de la curva S

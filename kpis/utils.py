@@ -48,15 +48,20 @@ def crear_proyecto(descripcion, encargado, id_departamento, fecha_inicio, fecha_
 
 def obtener_proyectos_usuario():
     """
-    Obtiene los proyectos creados por el usuario en sesión.
+    Obtiene los proyectos creados o asignados al usuario en sesión.
+    
+    Returns:
+        list: Lista de proyectos.
     """
     if 'user_id' not in session:
         return {"error": "Usuario no autenticado."}
     
-    proyectos = Proyecto.query.filter_by(encargado=session['user_id']).all()
+    proyectos = Proyecto.query.filter(
+        (Proyecto.encargado == session['user_id']) | 
+        (Proyecto.id_departamento == session['id_departamento'])
+    ).all()
     
-    return proyectos
-
+    return [p for p in proyectos]
 
 
 def agregar_actividad(id_proyecto, descripcion, id_usuario, fecha_inicio_planificada, fecha_fin_planificada, fecha_inicio_real=None, fecha_fin_real=None):
@@ -107,7 +112,6 @@ def obtener_actividades_proyecto(id_proyecto):
         list: Lista de actividades.
     """
     actividades = Actividad.query.filter_by(id_proyecto=id_proyecto).all()
-    
     return [a for a in actividades]
 
 
