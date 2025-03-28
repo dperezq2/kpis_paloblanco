@@ -52,3 +52,30 @@ class Actividad(db.Model):
 
     proyecto = db.relationship('Proyecto', backref=db.backref('actividades', lazy=True))
     usuario = db.relationship('Usuario', backref=db.backref('actividades', lazy=True))
+    
+    
+class KPI(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(200), nullable=False)
+    descripcion = db.Column(db.Text, nullable=False)
+    meta_porcentaje = db.Column(db.Float, nullable=False)  # Ejemplo: 95% 
+    total_unidades = db.Column(db.Integer, nullable=False)  # Ejemplo: 400 equipos
+    fecha_inicio = db.Column(db.Date, nullable=False)
+    fecha_fin = db.Column(db.Date, nullable=False)
+    estado = db.Column(db.String(20), default='en progreso')  # 'en progreso', 'completado'
+    id_usuario = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # Responsable
+    create_time = db.Column(db.TIMESTAMP, default=datetime.utcnow)
+
+    usuario = db.relationship('Usuario', backref=db.backref('kpis', lazy=True))
+
+
+class AvanceKPI(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    id_kpi = db.Column(db.Integer, db.ForeignKey('kpi.id'), nullable=False)
+    fecha_avance = db.Column(db.Date, nullable=False)
+    ubicacion = db.Column(db.String(100), nullable=False)  # Ejemplo: "Finca 1"
+    cantidad_avance = db.Column(db.Integer, nullable=False)  # Cantidad de equipos mantenidos en esa finca
+    comentario = db.Column(db.Text, nullable=True)  # Observaciones opcionales
+    create_time = db.Column(db.TIMESTAMP, default=datetime.utcnow)
+
+    kpi = db.relationship('KPI', backref=db.backref('avances', lazy=True))

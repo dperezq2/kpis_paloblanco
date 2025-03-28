@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Agregar KPI{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h3 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Agregar KPI</h3>
+            <a href="{{ url_for('mis_kpis') }}" class="btn btn-outline-light btn-sm d-flex align-items-center">
+                <i class="bi bi-arrow-left me-2"></i>Volver a Mis KPIs
+            </a>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('agregar_kpi') }}" id="kpiForm">
+                <div class="row g-3">
+                    <!-- Título -->
+                    <div class="col-md-6">
+                        <label for="titulo" class="form-label fw-bold"><i class="bi bi-tag-fill me-2"></i>Título</label>
+                        <input type="text" class="form-control" id="titulo" name="titulo" placeholder="Ej: Tasa de cumplimiento" required>
+                    </div>
+                    <!-- Meta Porcentaje -->
+                    <div class="col-md-6">
+                        <label for="meta_porcentaje" class="form-label fw-bold"><i class="bi bi-percent me-2"></i>Meta (%)</label>
+                        <input type="number" class="form-control" id="meta_porcentaje" name="meta_porcentaje" step="0.1" min="0" max="100" placeholder="Ej: 95" required>
+                    </div>
+                    <!-- Total Unidades -->
+                    <div class="col-md-6">
+                        <label for="total_unidades" class="form-label fw-bold"><i class="bi bi-boxes me-2"></i>Total Unidades</label>
+                        <input type="number" class="form-control" id="total_unidades" name="total_unidades" min="1" placeholder="Ej: 400" required>
+                    </div>
+                    <!-- Fecha Inicio -->
+                    <div class="col-md-6">
+                        <label for="fecha_inicio" class="form-label fw-bold"><i class="bi bi-calendar-event me-2"></i>Fecha Inicio</label>
+                        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" required>
+                    </div>
+                    <!-- Fecha Fin -->
+                    <div class="col-md-6">
+                        <label for="fecha_fin" class="form-label fw-bold"><i class="bi bi-calendar-check me-2"></i>Fecha Fin</label>
+                        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" required>
+                    </div>
+                    <!-- Descripción -->
+                    <div class="col-12">
+                        <label for="descripcion" class="form-label fw-bold"><i class="bi bi-textarea-resize me-2"></i>Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3" placeholder="Describe el KPI" required></textarea>
+                    </div>
+                </div>
+
+                <!-- Sección opcional para dividir por fincas -->
+                <div class="mt-4">
+                    <h5 class="mb-3"><i class="bi bi-list-ul me-2"></i>División por Categorías (Opcional)</h5>
+                    <div id="fincas-container">
+                        <div class="row g-3 finca-row mb-2">
+                            <div class="col-md-6">
+                                <input type="text" class="form-control" name="ubicacion_0" placeholder="Ej: Finca 1">
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" class="form-control cantidad-finca" name="cantidad_0" min="1" placeholder="Cantidad">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-outline-danger btn-sm w-100 remove-finca"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-outline-secondary" id="add-finca"><i class="bi bi-plus-circle me-2"></i>Agregar Categoría</button>
+                        <span id="total-fincas" class="ms-3 text-muted">Total asignado: 0 unidades</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <button type="submit" class="btn btn-dark" id="submit-btn"><i class="bi bi-plus-circle me-2"></i>Guardar KPI</button>
+                </div>
+            </form>
+
+            <!-- Mensajes flash -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} mt-3" role="alert">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+<script>
+    // Actualizar total de unidades asignadas
+    function updateTotalFincas() {
+        const totalUnidades = parseInt(document.getElementById('total_unidades').value) || 0;
+        const cantidades = document.querySelectorAll('.cantidad-finca');
+        let suma = 0;
+        cantidades.forEach(input => {
+            suma += parseInt(input.value) || 0;
+        });
+        const totalFincasSpan = document.getElementById('total-fincas');
+        totalFincasSpan.textContent = `Total asignado: ${suma} unidades`;
+        if (suma > totalUnidades && totalUnidades > 0) {
+            totalFincasSpan.classList.add('text-danger');
+            totalFincasSpan.classList.remove('text-muted');
+            document.getElementById('submit-btn').disabled = true;
+            alert('La suma de unidades por finca no puede exceder el total de unidades (' + totalUnidades + ').');
+        } else {
+            totalFincasSpan.classList.remove('text-danger');
+            totalFincasSpan.classList.add('text-muted');
+            document.getElementById('submit-btn').disabled = false;
+        }
+    }
+
+    // Agregar nueva finca
+    document.getElementById('add-finca').addEventListener('click', function() {
+        const container = document.getElementById('fincas-container');
+        const index = container.children.length;
+        const newRow = `
+            <div class="row g-3 finca-row mb-2">
+                <div class="col-md-6">
+                    <input type="text" class="form-control" name="ubicacion_${index}" placeholder="Ej: Finca ${index + 1}">
+                </div>
+                <div class="col-md-4">
+                    <input type="number" class="form-control cantidad-finca" name="cantidad_${index}" min="1" placeholder="Cantidad">
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-outline-danger btn-sm w-100 remove-finca"><i class="bi bi-trash"></i></button>
+                </div>
+            </div>`;
+        container.insertAdjacentHTML('beforeend', newRow);
+        // Añadir listener a la nueva cantidad
+        container.lastElementChild.querySelector('.cantidad-finca').addEventListener('input', updateTotalFincas);
+        updateTotalFincas();
+    });
+
+    // Eliminar finca
+    document.getElementById('fincas-container').addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-finca')) {
+            e.target.closest('.finca-row').remove();
+            updateTotalFincas();
+        }
+    });
+
+    // Actualizar total cuando cambie cualquier cantidad o total_unidades
+    document.querySelectorAll('.cantidad-finca').forEach(input => {
+        input.addEventListener('input', updateTotalFincas);
+    });
+    document.getElementById('total_unidades').addEventListener('input', updateTotalFincas);
+
+    // Validar al enviar el formulario
+    document.getElementById('kpiForm').addEventListener('submit', function(e) {
+        const totalUnidades = parseInt(document.getElementById('total_unidades').value) || 0;
+        const cantidades = document.querySelectorAll('.cantidad-finca');
+        let suma = 0;
+        cantidades.forEach(input => {
+            suma += parseInt(input.value) || 0;
+        });
+        if (suma > totalUnidades && totalUnidades > 0) {
+            e.preventDefault();
+            alert('La suma de unidades por finca no puede exceder el total de unidades.');
+        }
+    });
+</script>
+{% endblock %}

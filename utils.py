@@ -1,4 +1,4 @@
-from models import Usuario, Proyecto, Actividad, db
+from models import Usuario, Proyecto, Actividad, KPI, AvanceKPI, db
 from werkzeug.security import generate_password_hash
 from flask import session
 from datetime import datetime
@@ -209,3 +209,187 @@ def crear_usuario(username, password, email, id_departamento, status):
     
     return {"success": f"Usuario {username} creado correctamente."}
 
+
+
+
+
+# -----------------> KPIS <----------------------
+# Crear el KPI
+def crear_kpi(titulo, descripcion, meta_porcentaje, total_unidades, fecha_inicio, fecha_fin, id_usuario, fincas=None):
+    """
+    Crea un nuevo KPI en la base de datos y opcionalmente sus avances iniciales por finca.
+    
+    Args:
+        titulo (str): Título del KPI.
+        descripcion (str): Descripción del KPI.
+        meta_porcentaje (float): Meta en porcentaje (ej: 95.0).
+        total_unidades (int): Total de unidades objetivo (ej: 400).
+        fecha_inicio (str): Fecha de inicio del KPI (formato 'YYYY-MM-DD').
+        fecha_fin (str): Fecha de finalización del KPI (formato 'YYYY-MM-DD').
+        id_usuario (int): ID del usuario responsable del KPI.
+        fincas (list, optional): Lista de dicts con {'ubicacion': str, 'cantidad': int}.
+        
+    Returns:
+        dict: Resultado de la operación.
+    """
+    try:
+        nuevo_kpi = KPI(
+            titulo=titulo,
+            descripcion=descripcion,
+            meta_porcentaje=float(meta_porcentaje),
+            total_unidades=int(total_unidades),
+            fecha_inicio=datetime.strptime(fecha_inicio, '%Y-%m-%d').date(),
+            fecha_fin=datetime.strptime(fecha_fin, '%Y-%m-%d').date(),
+            id_usuario=id_usuario,
+            estado='en progreso',
+            create_time=datetime.utcnow()
+        )
+        
+        db.session.add(nuevo_kpi)
+        db.session.flush()  # Obtener el ID del KPI antes de commit
+
+        # Si hay fincas, registrarlas como avances iniciales
+        if fincas:
+            total_fincas = sum(finca['cantidad'] for finca in fincas)
+            if total_fincas > nuevo_kpi.total_unidades:
+                raise ValueError("La suma de unidades por finca excede el total de unidades.")
+            
+            for finca in fincas:
+                if finca['ubicacion'] and finca['cantidad']:
+                    avance = AvanceKPI(
+                        id_kpi=nuevo_kpi.id,
+                        fecha_avance=nuevo_kpi.fecha_inicio,  # Fecha inicial como referencia
+                        ubicacion=finca['ubicacion'],
+                        cantidad_avance=finca['cantidad'],
+                        comentario="Asignación inicial",
+                        create_time=datetime.utcnow()
+                    )
+                    db.session.add(avance)
+
+        db.session.commit()
+        return {"success": "KPI creado exitosamente.", "kpi_id": nuevo_kpi.id}
+    except Exception as e:
+        db.session.rollback()
+        return {"error": f"Error al crear el KPI: {str(e)}"}
+
+# Obtener los KPIs
+def obtener_kpis_usuario():
+    """
+    Obtiene los KPIs creados por el usuario en sesión.
+    
+    Returns:
+        list: Lista de objetos KPI o dict con error si no está autenticado.
+    """
+    if 'user_id' not in session:
+        return {"error": "Usuario no autenticado."}
+    
+    kpis = KPI.query.filter_by(id_usuario=session['user_id']).all()
+    
+    return kpis
+
+# Obtener detalles del KPI
+def obtener_detalle_kpi(id_kpi):
+    """
+    Obtiene los detalles de un KPI específico y sus avances, si el usuario tiene permiso.
+    
+    Args:
+        id_kpi (int): ID del KPI a consultar.
+    
+    Returns:
+        KPI: Objeto KPI o dict con error si no se encuentra o no tiene permiso.
+    """
+    if 'user_id' not in session:
+        return {"error": "Usuario no autenticado."}
+    
+    kpi = KPI.query.filter_by(id=id_kpi, id_usuario=session['user_id']).first()
+    if not kpi:
+        return {"error": "KPI no encontrado o no tienes permiso para verlo."}
+    
+    return kpi
+
+# Agregar avances al KPI
+def agregar_avance_kpi(id_kpi, fecha_avance, ubicacion, cantidad_avance, comentario=None):
+    try:
+        kpi = KPI.query.get(id_kpi)
+        if not kpi:
+            return {"error": "KPI no encontrado."}
+
+        # Validar si el KPI ya está completado
+        if kpi.estado == "completado":
+            return {"error": "No puedes agregar avances a un KPI que ya está completado."}
+
+        asignaciones = {a.ubicacion: a.cantidad_avance for a in kpi.avances if a.comentario == "Asignación inicial"}
+        if asignaciones:
+            if not ubicacion:
+                return {"error": "Debes especificar una categoría válida del desglose inicial."}
+            if ubicacion not in asignaciones:
+                return {"error": f"La categoría '{ubicacion}' no está en el desglose inicial."}
+        else:
+            ubicacion = ubicacion if ubicacion else None
+
+        if ubicacion and asignaciones and ubicacion in asignaciones:
+            total_avances = sum(a.cantidad_avance for a in kpi.avances 
+                              if a.ubicacion == ubicacion and a.comentario != "Asignación inicial")
+            if total_avances + int(cantidad_avance) > asignaciones[ubicacion]:
+                return {"error": f"No puedes exceder las {asignaciones[ubicacion]} unidades asignadas a {ubicacion}."}
+
+        avance = AvanceKPI(
+            id_kpi=id_kpi,
+            fecha_avance=datetime.strptime(fecha_avance, '%Y-%m-%d').date(),
+            ubicacion=ubicacion,
+            cantidad_avance=int(cantidad_avance),
+            comentario=comentario,
+            create_time=datetime.utcnow()
+        )
+        
+        db.session.add(avance)
+        total_avances_global = sum(a.cantidad_avance for a in kpi.avances if a.comentario != "Asignación inicial") + int(cantidad_avance)
+        if total_avances_global >= kpi.total_unidades:
+            kpi.estado = "completado"
+        else:
+            kpi.estado = "en progreso"
+
+        db.session.commit()
+        return {"success": "Avance registrado exitosamente."}
+    except Exception as e:
+        db.session.rollback()
+        return {"error": f"Error al registrar el avance: {str(e)}"}
+
+def agregar_categoria_inicial(id_kpi, nueva_categoria, cantidad_categoria):
+    try:
+        kpi = KPI.query.get(id_kpi)
+        if not kpi:
+            return {"error": "KPI no encontrado."}
+
+        # Verificar que la categoría no exista ya
+        asignaciones = {a.ubicacion: a.cantidad_avance for a in kpi.avances if a.comentario == "Asignación inicial"}
+        if nueva_categoria in asignaciones:
+            return {"error": f"La categoría '{nueva_categoria}' ya existe en el desglose inicial."}
+
+        # Calcular la suma actual de unidades asignadas
+        total_asignado = sum(a.cantidad_avance for a in kpi.avances if a.comentario == "Asignación inicial")
+        nueva_cantidad = int(cantidad_categoria)
+
+        # Validar que no se exceda el total_unidades
+        if total_asignado + nueva_cantidad > kpi.total_unidades:
+            unidades_restantes = kpi.total_unidades - total_asignado
+            if unidades_restantes <= 0:
+                return {"error": "No puedes agregar más categorías: el total de unidades ya está completamente asignado."}
+            return {"error": f"No puedes exceder el total de {kpi.total_unidades} unidades. Solo puedes asignar hasta {unidades_restantes} unidades más."}
+
+        # Crear un nuevo avance como "Asignación inicial"
+        nueva_asignacion = AvanceKPI(
+            id_kpi=id_kpi,
+            fecha_avance=kpi.fecha_inicio,  # Usar la fecha de inicio del KPI
+            ubicacion=nueva_categoria,
+            cantidad_avance=nueva_cantidad,
+            comentario="Asignación inicial",
+            create_time=datetime.utcnow()
+        )
+
+        db.session.add(nueva_asignacion)
+        db.session.commit()
+        return {"success": f"Categoría '{nueva_categoria}' agregada exitosamente."}
+    except Exception as e:
+        db.session.rollback()
+        return {"error": f"Error al agregar la categoría: {str(e)}"}

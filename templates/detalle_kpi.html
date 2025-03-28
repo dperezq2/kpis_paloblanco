@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Detalles del KPI - {{ kpi.titulo }}{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h3 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>{{ kpi.titulo }}</h3>
+            <a href="{{ url_for('mis_kpis') }}" class="btn btn-outline-light btn-sm d-flex align-items-center">
+                <i class="bi bi-arrow-left me-2"></i>Volver a Mis KPIs
+            </a>
+        </div>
+        <div class="card-body">
+            <!-- Detalles del KPI -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <p><strong><i class="bi bi-textarea-resize me-2"></i>Descripción:</strong> {{ kpi.descripcion }}</p>
+                    <p><strong><i class="bi bi-percent me-2"></i>Meta (%):</strong> {{ kpi.meta_porcentaje }}%</p>
+                    <p><strong><i class="bi bi-boxes me-2"></i>Total Unidades:</strong> {{ kpi.total_unidades }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong><i class="bi bi-calendar-event me-2"></i>Fecha Inicio:</strong> {{ kpi.fecha_inicio.strftime('%Y-%m-%d') }}</p>
+                    <p><strong><i class="bi bi-calendar-check me-2"></i>Fecha Fin:</strong> {{ kpi.fecha_fin.strftime('%Y-%m-%d') }}</p>
+                    <p><strong><i class="bi bi-clock me-2"></i>Estado:</strong> 
+                        <span class="badge {% if kpi.estado == 'completado' %}bg-success{% else %}bg-warning{% endif %}">
+                            {{ kpi.estado|capitalize }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Formulario para agregar avance -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Agregar Avance</h5>
+                <button type="submit" class="btn btn-dark" form="avanceForm"><i class="bi bi-save me-2"></i>Guardar Avance</button>
+            </div>
+            <form method="POST" action="{{ url_for('detalle_kpi', id=kpi.id) }}" id="avanceForm">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="fecha_avance" class="form-label fw-bold"><i class="bi bi-calendar-event me-2"></i>Fecha</label>
+                        <input type="date" class="form-control" id="fecha_avance" name="fecha_avance" required>
+                    </div>
+                    <div class="col-md-3">
+                        {% set asignaciones_iniciales = kpi.avances|selectattr('comentario', 'equalto', 'Asignación inicial')|list %}
+                        {% if asignaciones_iniciales %}
+                        <label for="ubicacion" class="form-label fw-bold"><i class="bi bi-list-ul me-2"></i>Categoría</label>
+                        <select class="form-control" id="ubicacion" name="ubicacion" required>
+                            {% for asignacion in asignaciones_iniciales %}
+                            <option value="{{ asignacion.ubicacion }}">{{ asignacion.ubicacion }}</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        <label for="ubicacion" class="form-label fw-bold"><i class="bi bi-geo-alt me-2"></i>Categoría (opcional)</label>
+                        <input type="text" class="form-control" id="ubicacion" name="ubicacion" placeholder="Ej: Finca 1">
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="cantidad_avance" class="form-label fw-bold"><i class="bi bi-box-seam me-2"></i>Cantidad</label>
+                        <input type="number" class="form-control" id="cantidad_avance" name="cantidad_avance" min="1" required>
+                    </div>
+                    <div class="col-md-12">
+                        <label for="comentario" class="form-label fw-bold"><i class="bi bi-chat-left-text me-2"></i>Comentario (opcional)</label>
+                        <textarea class="form-control" id="comentario" name="comentario" rows="2"></textarea>
+                    </div>
+                </div>
+            </form>
+            <hr class="my-4">
+
+            <!-- Definir avances reales una vez para todo el template -->
+            {% set avances_reales = kpi.avances|rejectattr('comentario', 'equalto', 'Asignación inicial')|list %}
+
+            <!-- Desglose por categorías con progreso -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Desglose por Categorías (Asignación Inicial)</h5>
+                {% if asignaciones_iniciales %}
+                <button type="button" class="btn btn-dark" data-bs-toggle="collapse" data-bs-target="#agregarCategoriaForm" id="toggleCategoriaBtn">
+                    <i class="bi bi-plus-circle me-2" id="toggleIcon"></i>Agregar Categoría
+                </button>
+                {% endif %}
+            </div>
+            {% if asignaciones_iniciales %}
+            <!-- Formulario para agregar nueva categoría -->
+            <div class="collapse mb-3" id="agregarCategoriaForm">
+                <form method="POST" action="{{ url_for('agregar_categoria_kpi', id=kpi.id) }}">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="nueva_categoria" class="form-label fw-bold"><i class="bi bi-list-ul me-2"></i>Nueva Categoría</label>
+                            <input type="text" class="form-control" id="nueva_categoria" name="nueva_categoria" required placeholder="Ej: Finca 3">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="cantidad_categoria" class="form-label fw-bold"><i class="bi bi-box-seam me-2"></i>Unidades</label>
+                            <input type="number" class="form-control" id="cantidad_categoria" name="cantidad_categoria" min="1" required>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-dark w-100"><i class="bi bi-save me-2"></i>Guardar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th><i class="bi bi-list-ul me-2"></i>Categoría</th>
+                            <th><i class="bi bi-box-seam me-2"></i>Unidades Asignadas</th>
+                            <th><i class="bi bi-percent me-2"></i>Porcentaje Asignado</th>
+                            <th><i class="bi bi-graph-up me-2"></i>Progreso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asignacion in asignaciones_iniciales %}
+                        {% set progreso = avances_reales|selectattr('ubicacion', 'equalto', asignacion.ubicacion)|sum(attribute='cantidad_avance') %}
+                        <tr>
+                            <td>{{ asignacion.ubicacion }}</td>
+                            <td>{{ asignacion.cantidad_avance }}</td>
+                            <td>{{ ((asignacion.cantidad_avance / kpi.total_unidades) * kpi.meta_porcentaje)|round(2) }}%</td>
+                            <td>{{ progreso }} / {{ asignacion.cantidad_avance }} ({{ (progreso / asignacion.cantidad_avance * 100)|round(2) }}%)</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted"><i class="bi bi-exclamation-circle me-2"></i>No se asignaron categorías iniciales.</p>
+            {% endif %}
+            <hr class="my-4">
+
+            <!-- Avances registrados -->
+            <h5 class="mb-3"><i class="bi bi-graph-up me-2"></i>Avances Registrados</h5>
+            {% if avances_reales %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th><i class="bi bi-calendar-event me-2"></i>Fecha</th>
+                            <th><i class="bi bi-list-ul me-2"></i>Categoría</th>
+                            <th><i class="bi bi-box-seam me-2"></i>Cantidad Avanzada</th>
+                            <th><i class="bi bi-chat-left-text me-2"></i>Comentario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for avance in avances_reales %}
+                        <tr>
+                            <td>{{ avance.fecha_avance.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ avance.ubicacion|default('Sin ubicación', true) }}</td>
+                            <td>{{ avance.cantidad_avance }}</td>
+                            <td>{{ avance.comentario|default('Sin comentarios', true) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted"><i class="bi bi-exclamation-circle me-2"></i>No hay avances registrados aún.</p>
+            {% endif %}
+
+            <!-- Mensajes flash -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} mt-3" role="alert">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+<!-- JavaScript para cambiar el ícono -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const toggleBtn = document.getElementById('toggleCategoriaBtn');
+        const toggleIcon = document.getElementById('toggleIcon');
+        const collapseForm = document.getElementById('agregarCategoriaForm');
+
+        if (toggleBtn && toggleIcon && collapseForm) {
+            collapseForm.addEventListener('show.bs.collapse', function () {
+                toggleIcon.classList.remove('bi-plus-circle');
+                toggleIcon.classList.add('bi-dash-circle');
+            });
+            collapseForm.addEventListener('hide.bs.collapse', function () {
+                toggleIcon.classList.remove('bi-dash-circle');
+                toggleIcon.classList.add('bi-plus-circle');
+            });
+        }
+    });
+</script>
+{% endblock %}

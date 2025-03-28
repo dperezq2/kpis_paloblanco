@@ -5,7 +5,7 @@ import pandas as pd
 import random
 from database import init_db, db
 from models import Proyecto, Actividad, Usuario, Departamento
-from utils import crear_proyecto, agregar_actividad, actualizar_actividad, obtener_proyectos_usuario, obtener_actividades_proyecto, calcular_porcentaje_avance
+from utils import crear_proyecto, agregar_actividad, actualizar_actividad, obtener_proyectos_usuario, obtener_actividades_proyecto, calcular_porcentaje_avance, crear_kpi, obtener_kpis_usuario, obtener_detalle_kpi, agregar_avance_kpi, agregar_categoria_inicial
 from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
 import calendar
@@ -317,6 +317,112 @@ def agregar_actividades(id_proyecto):
         return redirect(url_for('detalle_proyecto', id=id_proyecto))
 
     return render_template('agregar_actividad.html', proyecto_id=id_proyecto)
+
+
+# ------------------------------> KPIS <------------------------------
+# Ruta para agregar KPI
+@app.route('/agregar_kpi', methods=['GET', 'POST'])
+def agregar_kpi():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        titulo = request.form.get('titulo')
+        descripcion = request.form.get('descripcion')
+        meta_porcentaje = request.form.get('meta_porcentaje')
+        total_unidades = request.form.get('total_unidades')
+        fecha_inicio = request.form.get('fecha_inicio')
+        fecha_fin = request.form.get('fecha_fin')
+        id_usuario = session.get('user_id')
+
+        # Procesar fincas (opcional)
+        fincas = []
+        index = 0
+        while f"ubicacion_{index}" in request.form:
+            ubicacion = request.form.get(f"ubicacion_{index}")
+            cantidad = request.form.get(f"cantidad_{index}")
+            if ubicacion and cantidad:
+                fincas.append({"ubicacion": ubicacion, "cantidad": int(cantidad)})
+            index += 1
+
+        resultado = crear_kpi(titulo, descripcion, meta_porcentaje, total_unidades, fecha_inicio, fecha_fin, id_usuario, fincas)
+        
+        if 'error' in resultado:
+            flash(resultado['error'], "danger")
+            return redirect(url_for('agregar_kpi'))
+        
+        flash("KPI creado exitosamente.", "success")
+        return redirect(url_for('mis_kpis'))
+
+    return render_template("agregar_kpi.html", 
+                        user_name=session.get('user_name'), 
+                        user_email=session.get('user_email'),
+                        user_departamento=session.get('user_departamento'),
+                        current_year=datetime.now().year)
+
+# Ruta para mostrar los KPIs
+@app.route('/mis_kpis')
+def mis_kpis():
+    """
+    Muestra los KPIs asociados al usuario en sesión.
+    """
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    kpis = obtener_kpis_usuario()
+    if isinstance(kpis, dict) and 'error' in kpis:
+        flash(kpis['error'], "danger")
+        return redirect(url_for('login'))
+    
+    return render_template('mis_kpis.html', kpis=kpis)
+
+# Ruta para mostrar y actualizar detalles del KPI
+@app.route('/detalle_kpi/<int:id>', methods=['GET', 'POST'])
+def detalle_kpi(id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    kpi = obtener_detalle_kpi(id)
+    if isinstance(kpi, dict) and 'error' in kpi:
+        flash(kpi['error'], "danger")
+        return redirect(url_for('mis_kpis'))
+    
+    if request.method == 'POST' and 'fecha_avance' in request.form:  # Para avances
+        fecha_avance = request.form.get('fecha_avance')
+        ubicacion = request.form.get('ubicacion')
+        cantidad_avance = request.form.get('cantidad_avance')
+        comentario = request.form.get('comentario') or None
+        
+        resultado = agregar_avance_kpi(id, fecha_avance, ubicacion, cantidad_avance, comentario)
+        if 'error' in resultado:
+            flash(resultado['error'], "danger")
+        else:
+            flash(resultado['success'], "success")
+        return redirect(url_for('detalle_kpi', id=id))
+    
+    return render_template('detalle_kpi.html', kpi=kpi)
+
+# Agregar categorías en el detalle kpi
+@app.route('/agregar_categoria_kpi/<int:id>', methods=['POST'])
+def agregar_categoria_kpi(id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    kpi = obtener_detalle_kpi(id)
+    if isinstance(kpi, dict) and 'error' in kpi:
+        flash(kpi['error'], "danger")
+        return redirect(url_for('mis_kpis'))
+    
+    nueva_categoria = request.form.get('nueva_categoria')
+    cantidad_categoria = request.form.get('cantidad_categoria')
+    
+    resultado = agregar_categoria_inicial(id, nueva_categoria, cantidad_categoria)
+    if 'error' in resultado:
+        flash(resultado['error'], "danger")
+    else:
+        flash(resultado['success'], "success")
+    
+    return redirect(url_for('detalle_kpi', id=id))
 
 # Ruta para dashboard
 @app.route('/dashboard')
@@ -695,6 +801,7 @@ def dashboard():
         estado=selected_estado,
         proyecto_descripcion=proyecto_descripcion
     )
+
 
 @app.context_processor
 def inject_user_data():
